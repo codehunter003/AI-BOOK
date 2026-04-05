@@ -23,7 +23,7 @@ app.add_middleware(
 # Paste your free Gemini API key from: https://aistudio.google.com/app/apikey
 # NOTE: File uploads require python-multipart. Install with:
 #   pip install python-multipart
-GEMINI_API_KEY = "AIzaSyAMRGVTHagpIJ3eOQRKVpnPeJHk13k-uKg"
+GEMINI_API_KEY = "give your gemini key"
 
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
 
