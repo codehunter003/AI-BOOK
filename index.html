@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>VoiceLens — Speak. Distil. Understand.</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0d0d0d;
+    --surface:   #141414;
+    --surface2:  #1a1a1a;
+    --border:    #2a2a2a;
+    --amber:     #f5a623;
+    --amber-dim: #7a5210;
+    --amber-glow:rgba(245,166,35,0.08);
+    --green:     #3ddc84;
+    --red:       #ff5c5c;
+    --blue:      #5c9eff;
+    --text:      #e8e8e8;
+    --muted:     #555;
+    --mono:      'Space Mono', monospace;
+    --display:   'Syne', sans-serif;
+    --radius:    4px;
+    --tr:        220ms cubic-bezier(.4,0,.2,1);
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 14px;
+    line-height: 1.6;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none; z-index: 999; opacity: 0.6;
+  }
+
+  .app { max-width: 780px; margin: 0 auto; padding: 48px 24px 80px; }
+
+  /* ── Header ── */
+  header {
+    margin-bottom: 48px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 24px;
+    display: flex; align-items: flex-end;
+    justify-content: space-between; flex-wrap: wrap; gap: 12px;
+  }
+  .logo { font-family: var(--display); font-size: 28px; font-weight: 800; letter-spacing: -1px; }
+  .logo span { color: var(--amber); }
+  .tagline { font-size: 11px; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; }
+
+  /* ── Mode Tabs ── */
+  .mode-tabs {
+    display: flex; gap: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden; margin-bottom: 28px;
+  }
+  .tab-btn {
+    flex: 1; padding: 11px 16px;
+    background: transparent; color: var(--muted);
+    border: none; font-family: var(--mono);
+    font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
+    cursor: pointer; transition: background var(--tr), color var(--tr);
+    border-right: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .tab-btn:last-child { border-right: none; }
+  .tab-btn.active { background: var(--amber-glow); color: var(--amber); }
+  .tab-btn:hover:not(.active) { background: var(--surface2); color: var(--text); }
+  .tab-icon { font-size: 14px; }
+
+  .tab-pane { display: none; }
+  .tab-pane.active { display: block; }
+
+  /* ── Section label ── */
+  .section-label {
+    font-size: 10px; letter-spacing: 3px; text-transform: uppercase;
+    color: var(--amber); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  /* ── Card ── */
+  .panel {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 20px; margin-bottom: 16px;
+    transition: border-color var(--tr);
+  }
+  .panel:focus-within { border-color: var(--amber-dim); }
+
+  /* ── Record ── */
+  .record-controls { display: flex; align-items: center; gap: 16px; margin-bottom: 14px; }
+  .btn-record {
+    display: flex; align-items: center; gap: 8px; padding: 10px 20px;
+    border: 1px solid var(--amber); background: transparent; color: var(--amber);
+    font-family: var(--mono); font-size: 13px; border-radius: var(--radius);
+    cursor: pointer; transition: background var(--tr), color var(--tr); white-space: nowrap;
+  }
+  .btn-record:hover { background: var(--amber); color: #000; }
+  .btn-record.recording {
+    background: var(--red); border-color: var(--red); color: #fff;
+    animation: pulse-border 1.4s infinite;
+  }
+  @keyframes pulse-border {
+    0%,100% { box-shadow: 0 0 0 0 rgba(255,92,92,0.4); }
+    50%      { box-shadow: 0 0 0 6px rgba(255,92,92,0); }
+  }
+  .mic-dot { width: 9px; height: 9px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+  .btn-record.recording .mic-dot { animation: blink 0.8s infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .status-badge { font-size: 11px; color: var(--muted); letter-spacing: 1px; }
+  .status-badge.live { color: var(--green); }
+
+  textarea.transcript {
+    width: 100%; min-height: 120px; resize: vertical;
+    background: transparent; border: none; outline: none;
+    color: var(--text); font-family: var(--mono); font-size: 13px; line-height: 1.7;
+  }
+  textarea.transcript::placeholder { color: var(--muted); }
+  .char-count { font-size: 11px; color: var(--muted); text-align: right; margin-top: 6px; }
+
+  /* ── Upload zone ── */
+  .upload-zone {
+    border: 1px dashed var(--border); border-radius: var(--radius);
+    padding: 36px 24px; text-align: center; cursor: pointer;
+    transition: border-color var(--tr), background var(--tr);
+    background: transparent; position: relative;
+  }
+  .upload-zone:hover, .upload-zone.drag-over {
+    border-color: var(--amber); background: var(--amber-glow);
+  }
+  .upload-zone input[type="file"] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+  }
+  .upload-icon { font-size: 32px; margin-bottom: 10px; opacity: 0.5; }
+  .upload-title { font-family: var(--display); font-size: 15px; font-weight: 700; margin-bottom: 6px; }
+  .upload-sub { font-size: 11px; color: var(--muted); letter-spacing: 1px; }
+  .upload-formats { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+  .fmt-tag {
+    font-size: 10px; padding: 3px 8px; border: 1px solid var(--border);
+    border-radius: 2px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase;
+  }
+
+  /* file preview card */
+  .file-selected {
+    margin-top: 16px; background: var(--surface2);
+    border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 12px 16px; display: flex; align-items: center; gap: 12px;
+  }
+  .file-icon { font-size: 20px; }
+  .file-info { flex: 1; min-width: 0; }
+  .file-name { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .file-size { font-size: 11px; color: var(--muted); }
+  .file-clear { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 18px; padding: 0 4px; transition: color var(--tr); }
+  .file-clear:hover { color: var(--red); }
+
+  /* result sub-tabs */
+  .result-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+  .result-tab {
+    padding: 8px 16px; font-size: 11px; letter-spacing: 1px;
+    text-transform: uppercase; color: var(--muted);
+    border: none; background: none; cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: color var(--tr), border-color var(--tr); font-family: var(--mono);
+  }
+  .result-tab.active { color: var(--amber); border-bottom-color: var(--amber); }
+  .result-tab:hover:not(.active) { color: var(--text); }
+  .result-pane { display: none; }
+  .result-pane.active { display: block; }
+
+  /* ── Action button ── */
+  .btn-action {
+    width: 100%; padding: 13px; background: var(--amber); color: #000;
+    border: none; border-radius: var(--radius);
+    font-family: var(--display); font-size: 14px; font-weight: 700;
+    letter-spacing: 1px; text-transform: uppercase; cursor: pointer;
+    transition: opacity var(--tr), transform var(--tr); margin-bottom: 16px;
+  }
+  .btn-action:hover:not(:disabled) { opacity: 0.88; transform: translateY(-1px); }
+  .btn-action:active:not(:disabled) { transform: translateY(0); }
+  .btn-action:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+  .btn-action.blue { background: var(--blue); }
+
+  /* ── Output ── */
+  .output-text { font-size: 13px; line-height: 1.8; color: var(--text); white-space: pre-wrap; }
+
+  /* ── Loader ── */
+  .loader { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
+  .loader-dots span {
+    display: inline-block; width: 5px; height: 5px;
+    border-radius: 50%; background: var(--amber); animation: bounce 1.2s infinite;
+  }
+  .loader-dots span:nth-child(2) { animation-delay: 0.2s; }
+  .loader-dots span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes bounce {
+    0%,80%,100% { transform: translateY(0); opacity: 0.4; }
+    40%          { transform: translateY(-6px); opacity: 1; }
+  }
+  .progress-wrap { height: 2px; background: var(--border); border-radius: 2px; overflow: hidden; margin-top: 12px; }
+  .progress-bar { height: 100%; background: var(--amber); animation: indeterminate 1.5s infinite; }
+  @keyframes indeterminate {
+    0%   { transform: translateX(-100%); width: 60%; }
+    100% { transform: translateX(200%);  width: 60%; }
+  }
+
+  /* ── Q&A ── */
+  .qa-list { list-style: none; }
+  .qa-item {
+    border-bottom: 1px solid var(--border); padding: 14px 0;
+    opacity: 0; transform: translateY(8px); animation: slide-in 300ms forwards;
+  }
+  .qa-item:last-child { border-bottom: none; }
+  @keyframes slide-in { to { opacity: 1; transform: translateY(0); } }
+  .qa-q { font-weight: 700; color: var(--amber); margin-bottom: 5px; font-size: 13px; }
+  .qa-q::before { content: 'Q  '; color: var(--amber-dim); }
+  .qa-a { color: var(--text); font-size: 13px; line-height: 1.7; padding-left: 20px; border-left: 2px solid var(--amber-dim); }
+
+  .empty { color: var(--muted); font-size: 12px; font-style: italic; }
+  .error-bar {
+    background: rgba(255,92,92,0.10); border: 1px solid var(--red);
+    color: var(--red); border-radius: var(--radius);
+    padding: 10px 14px; font-size: 12px; margin-bottom: 12px; display: none;
+  }
+  .error-bar.show { display: block; }
+
+  footer {
+    margin-top: 48px; border-top: 1px solid var(--border);
+    padding-top: 16px; font-size: 11px; color: var(--muted);
+    display: flex; justify-content: space-between;
+  }
+
+  @media (max-width: 520px) {
+    header { flex-direction: column; align-items: flex-start; }
+    .logo { font-size: 22px; }
+    .tab-btn .tab-label { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div>
+      <div class="logo">Voice<span>Lens</span></div>
+      <div class="tagline">Speak · Distil · Understand</div>
+    </div>
+    <div class="tagline" id="api-status">● API ready</div>
+  </header>
+
+  <div class="error-bar" id="error-bar"></div>
+
+  <!-- Mode switcher -->
+  <div class="mode-tabs">
+    <button class="tab-btn active" onclick="switchMode('voice')" id="tab-voice">
+      <span class="tab-icon">🎙</span>
+      <span class="tab-label">Voice / Text</span>
+    </button>
+    <button class="tab-btn" onclick="switchMode('file')" id="tab-file">
+      <span class="tab-icon">📁</span>
+      <span class="tab-label">Upload File</span>
+    </button>
+  </div>
+
+  <!-- ══════════ VOICE / TEXT ══════════ -->
+  <div class="tab-pane active" id="pane-voice">
+
+    <div class="section-label">01 / Capture</div>
+    <div class="panel">
+      <div class="record-controls">
+        <button class="btn-record" id="btn-record" onclick="toggleRecord()">
+          <span class="mic-dot"></span>
+          <span id="btn-record-label">Start Recording</span>
+        </button>
+        <span class="status-badge" id="rec-status">IDLE</span>
+      </div>
+      <textarea class="transcript" id="transcript"
+        placeholder="Your speech will appear here as you speak…&#10;You can also type or paste text directly."
+        oninput="onTranscriptChange()"></textarea>
+      <div class="char-count"><span id="char-count">0</span> characters</div>
+    </div>
+
+    <div class="section-label">02 / Summarise</div>
+    <button class="btn-action" id="btn-summarize" onclick="doSummarize()" disabled>→ Summarise</button>
+    <div class="panel">
+      <div id="summary-content" class="empty">Summary will appear here…</div>
+    </div>
+
+    <div class="section-label">03 / Q&amp;A</div>
+    <button class="btn-action" id="btn-qa" onclick="doQA()" disabled>→ Generate Q&amp;A</button>
+    <div class="panel">
+      <ul class="qa-list" id="qa-list">
+        <li class="empty">Questions and answers will appear here…</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ══════════ FILE UPLOAD ══════════ -->
+  <div class="tab-pane" id="pane-file">
+
+    <div class="section-label">01 / Upload File</div>
+    <div class="panel">
+      <div class="upload-zone" id="upload-zone">
+        <input type="file" id="file-input"
+          accept=".mp3,.wav,.m4a,.ogg,.flac,.aac,.webm,.mp4,.mkv,.mov,.avi,.txt,.pdf"
+          onchange="onFileSelected(event)" />
+        <div class="upload-icon">⬆</div>
+        <div class="upload-title">Drop file here or click to browse</div>
+        <div class="upload-sub">Audio · Video · Text · PDF</div>
+        <div class="upload-formats">
+          <span class="fmt-tag">mp3</span><span class="fmt-tag">wav</span>
+          <span class="fmt-tag">m4a</span><span class="fmt-tag">ogg</span>
+          <span class="fmt-tag">flac</span><span class="fmt-tag">aac</span>
+          <span class="fmt-tag">mp4</span><span class="fmt-tag">mov</span>
+          <span class="fmt-tag">avi</span><span class="fmt-tag">txt</span>
+          <span class="fmt-tag">pdf</span>
+        </div>
+      </div>
+
+      <div class="file-selected" id="file-selected" style="display:none">
+        <div class="file-icon" id="file-icon">🎵</div>
+        <div class="file-info">
+          <div class="file-name" id="file-name"></div>
+          <div class="file-size" id="file-size"></div>
+        </div>
+        <button class="file-clear" onclick="clearFile()" title="Remove">✕</button>
+      </div>
+    </div>
+
+    <div class="section-label">02 / Process</div>
+    <button class="btn-action blue" id="btn-upload" onclick="doUpload()" disabled>→ Transcribe &amp; Summarise</button>
+
+    <div class="section-label">03 / Results</div>
+    <div class="panel" id="upload-results-panel">
+      <div id="upload-empty" class="empty">Upload a file and click Process to see results…</div>
+      <div id="upload-results" style="display:none">
+        <div class="result-tabs">
+          <button class="result-tab active" data-tab="transcription" onclick="switchResultTab(this,'transcription')">Transcription</button>
+          <button class="result-tab" data-tab="summary" onclick="switchResultTab(this,'summary')">Summary</button>
+          <button class="result-tab" data-tab="qa" onclick="switchResultTab(this,'qa')">Q&amp;A</button>
+        </div>
+        <div class="result-pane active" id="rtab-transcription">
+          <div class="output-text" id="upload-transcription"></div>
+        </div>
+        <div class="result-pane" id="rtab-summary">
+          <div class="output-text" id="upload-summary"></div>
+        </div>
+        <div class="result-pane" id="rtab-qa">
+          <ul class="qa-list" id="upload-qa-list"></ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <span>VoiceLens</span>
+    <span>Web Speech API + Gemini backend</span>
+  </footer>
+</div>
+
+<script>
+const API_BASE = 'http://localhost:8000';
+
+// ── Mode switcher ──────────────────────────────────────
+function switchMode(mode) {
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('pane-' + mode).classList.add('active');
+  document.getElementById('tab-' + mode).classList.add('active');
+  clearError();
+}
+
+// ── Speech recognition ────────────────────────────────
+let recognition = null, isRecording = false, currentSummary = '';
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+if (!SR) {
+  document.getElementById('btn-record').disabled = true;
+  document.getElementById('rec-status').textContent = 'UNSUPPORTED';
+}
+
+function toggleRecord() { isRecording ? stopRecord() : startRecord(); }
+
+function startRecord() {
+  recognition = new SR();
+  recognition.continuous = true; recognition.interimResults = true; recognition.lang = 'en-US';
+  let finalText = document.getElementById('transcript').value;
+  recognition.onstart = () => {
+    isRecording = true;
+    document.getElementById('btn-record').classList.add('recording');
+    document.getElementById('btn-record-label').textContent = 'Stop Recording';
+    setStatus('● LIVE', true);
+  };
+  recognition.onresult = (e) => {
+    let interim = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) finalText += e.results[i][0].transcript + ' ';
+      else interim += e.results[i][0].transcript;
+    }
+    document.getElementById('transcript').value = finalText + interim;
+    onTranscriptChange();
+  };
+  recognition.onerror = (e) => { showError('Mic error: ' + e.error); stopRecord(); };
+  recognition.onend   = () => { if (isRecording) recognition.start(); };
+  recognition.start();
+}
+
+function stopRecord() {
+  isRecording = false;
+  if (recognition) { recognition.onend = null; recognition.stop(); }
+  document.getElementById('btn-record').classList.remove('recording');
+  document.getElementById('btn-record-label').textContent = 'Start Recording';
+  setStatus('IDLE', false);
+}
+
+function setStatus(text, live) {
+  const el = document.getElementById('rec-status');
+  el.textContent = text; el.classList.toggle('live', live);
+}
+
+function onTranscriptChange() {
+  const val = document.getElementById('transcript').value;
+  document.getElementById('char-count').textContent = val.length;
+  document.getElementById('btn-summarize').disabled = val.trim().length < 10;
+}
+
+async function doSummarize() {
+  const text = document.getElementById('transcript').value.trim();
+  if (!text) return;
+  clearError(); setOutput('summary-content', null); setBtnLoading('btn-summarize', true);
+  document.getElementById('btn-qa').disabled = true;
+  try {
+    const res = await fetch(`${API_BASE}/summarize`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text })
+    });
+    if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
+    const data = await res.json();
+    currentSummary = data.summary;
+    setOutput('summary-content', data.summary);
+    document.getElementById('btn-qa').disabled = false;
+  } catch (err) {
+    showError('Summarise failed: ' + err.message); setOutput('summary-content', '');
+  } finally { setBtnLoading('btn-summarize', false); }
+}
+
+async function doQA() {
+  if (!currentSummary) return;
+  clearError(); setQALoading(true); setBtnLoading('btn-qa', true);
+  try {
+    const res = await fetch(`${API_BASE}/generate-qa`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ summary: currentSummary })
+    });
+    if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
+    const data = await res.json();
+    renderQA('qa-list', data.qa_pairs);
+  } catch (err) {
+    showError('Q&A failed: ' + err.message); setQALoading(false);
+  } finally { setBtnLoading('btn-qa', false); }
+}
+
+// ── File Upload ───────────────────────────────────────
+let selectedFile = null;
+
+const zone = document.getElementById('upload-zone');
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+zone.addEventListener('drop', e => {
+  e.preventDefault(); zone.classList.remove('drag-over');
+  if (e.dataTransfer.files.length) applyFile(e.dataTransfer.files[0]);
+});
+
+function onFileSelected(e) { if (e.target.files.length) applyFile(e.target.files[0]); }
+
+function applyFile(f) {
+  selectedFile = f;
+  const ext = f.name.split('.').pop().toLowerCase();
+  const iconMap = { mp3:'🎵', wav:'🎵', m4a:'🎵', ogg:'🎵', flac:'🎵', aac:'🎵',
+                    mp4:'🎬', mkv:'🎬', mov:'🎬', avi:'🎬', webm:'🎬',
+                    pdf:'📄', txt:'📝' };
+  document.getElementById('file-icon').textContent = iconMap[ext] || '📁';
+  document.getElementById('file-name').textContent = f.name;
+  document.getElementById('file-size').textContent = formatBytes(f.size);
+  document.getElementById('file-selected').style.display = 'flex';
+  document.getElementById('btn-upload').disabled = false;
+  document.getElementById('upload-empty').style.display = 'block';
+  document.getElementById('upload-empty').className = 'empty';
+  document.getElementById('upload-empty').textContent = 'Upload a file and click Process to see results…';
+  document.getElementById('upload-results').style.display = 'none';
+  clearError();
+}
+
+function clearFile() {
+  selectedFile = null;
+  document.getElementById('file-input').value = '';
+  document.getElementById('file-selected').style.display = 'none';
+  document.getElementById('btn-upload').disabled = true;
+}
+
+function formatBytes(b) {
+  if (b < 1024) return b + ' B';
+  if (b < 1048576) return (b/1024).toFixed(1) + ' KB';
+  return (b/1048576).toFixed(1) + ' MB';
+}
+
+async function doUpload() {
+  if (!selectedFile) { showError('No file selected.'); return; }
+  clearError(); setBtnLoading('btn-upload', true);
+  const empty = document.getElementById('upload-empty');
+  empty.style.display = 'block';
+  empty.className = '';
+  empty.innerHTML = `<div class="loader"><div class="loader-dots"><span></span><span></span><span></span></div> Processing — this may take a moment…</div><div class="progress-wrap"><div class="progress-bar"></div></div>`;
+  document.getElementById('upload-results').style.display = 'none';
+
+  // IMPORTANT: Do NOT set Content-Type header manually.
+  // Browser must set multipart/form-data with correct boundary automatically.
+  const fd = new FormData();
+  fd.append('file', selectedFile, selectedFile.name);
+
+  try {
+    const res = await fetch(`${API_BASE}/upload-and-summarize`, {
+      method: 'POST',
+      body: fd
+    });
+
+    if (!res.ok) {
+      let detail = res.statusText;
+      try { detail = (await res.json()).detail || detail; } catch (_) {}
+      throw new Error(res.status + ': ' + detail);
+    }
+
+    const data = await res.json();
+    document.getElementById('upload-transcription').textContent = data.transcription || '—';
+    document.getElementById('upload-summary').textContent       = data.summary       || '—';
+    renderQA('upload-qa-list', data.qa_pairs);
+
+    empty.style.display = 'none';
+    document.getElementById('upload-results').style.display = 'block';
+    document.querySelectorAll('.result-tab')[0].click();
+  } catch (err) {
+    showError('Upload failed: ' + err.message);
+    empty.className = 'empty'; empty.textContent = 'Processing failed. Try again.';
+  } finally { setBtnLoading('btn-upload', false); }
+}
+
+function switchResultTab(btn, tab) {
+  document.querySelectorAll('.result-tab').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.result-pane').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('rtab-' + tab).classList.add('active');
+}
+
+// ── Shared helpers ────────────────────────────────────
+function setOutput(id, text) {
+  const el = document.getElementById(id);
+  if (text === null) {
+    el.innerHTML = `<div class="loader"><div class="loader-dots"><span></span><span></span><span></span></div> Processing…</div>`;
+  } else if (!text) {
+    el.innerHTML = '<span class="empty">No result.</span>';
+  } else {
+    el.className = 'output-text'; el.textContent = text;
+  }
+}
+function setQALoading(on) {
+  if (on) document.getElementById('qa-list').innerHTML =
+    `<li><div class="loader"><div class="loader-dots"><span></span><span></span><span></span></div> Generating…</div></li>`;
+}
+function renderQA(listId, pairs) {
+  const list = document.getElementById(listId);
+  if (!pairs || !pairs.length) { list.innerHTML = '<li class="empty">No Q&A generated.</li>'; return; }
+  list.innerHTML = pairs.map((p, i) => `
+    <li class="qa-item" style="animation-delay:${i*80}ms">
+      <div class="qa-q">${esc(p.question)}</div>
+      <div class="qa-a">${esc(p.answer)}</div>
+    </li>`).join('');
+}
+function setBtnLoading(id, on) {
+  const btn = document.getElementById(id);
+  btn.disabled = on;
+  if (on) { btn.dataset.orig = btn.textContent; btn.textContent = '⋯ Working'; }
+  else btn.textContent = btn.dataset.orig || btn.textContent;
+}
+function showError(msg) {
+  const bar = document.getElementById('error-bar');
+  bar.textContent = '⚠ ' + msg; bar.classList.add('show');
+}
+function clearError() { document.getElementById('error-bar').classList.remove('show'); }
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+</script>
+</body>
+</html>
